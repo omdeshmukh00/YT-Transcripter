@@ -1,7 +1,6 @@
 'use client';
 
 import React, { useState, useEffect, useCallback, useRef } from 'react';
-import Image from 'next/image';
 import { FiAlertTriangle, FiWifiOff, FiInfo } from 'react-icons/fi';
 import UrlInput from '../components/UrlInput';
 import Loading from '../components/Loading';
@@ -577,16 +576,12 @@ export default function Home() {
         
         {/* App Title & Slogan matching the uploaded screenshot */}
         <div className="text-center py-4 font-sans">
-          <div className="relative w-14 h-14 sm:w-16 sm:h-16 mx-auto mb-4">
-            <Image
-              src="/icon.png"
-              alt="YT Transcripter"
-              width={64}
-              height={64}
-              className="w-full h-full object-contain rounded-2xl shadow-[0_4px_20px_rgba(0,0,0,0.06)] dark:shadow-[0_4px_20px_rgba(0,0,0,0.25)]"
-              priority
-            />
-          </div>
+          <div
+            role="img"
+            aria-label="YT Transcripter"
+            className="w-14 h-14 sm:w-16 sm:h-16 mx-auto mb-4 bg-cover bg-center rounded-2xl shadow-[0_4px_20px_rgba(0,0,0,0.06)] dark:shadow-[0_4px_20px_rgba(0,0,0,0.25)]"
+            style={{ backgroundImage: "url('/icon.png')" }}
+          />
           <h1 className="text-3xl sm:text-4xl font-extrabold tracking-tight text-zinc-900 dark:text-zinc-50 leading-none">
             YT Transcripter
           </h1>

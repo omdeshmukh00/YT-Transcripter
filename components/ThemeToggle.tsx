@@ -6,12 +6,20 @@ import { FiSun, FiMoon, FiMonitor } from 'react-icons/fi';
 type Theme = 'light' | 'dark' | 'system';
 
 export default function ThemeToggle() {
-  const [theme, setTheme] = useState<Theme>(() => {
-    if (typeof window === 'undefined') return 'light';
-    return (localStorage.getItem('theme') as Theme) || 'light';
-  });
+  const [theme, setTheme] = useState<Theme>('light');
   const [isOpen, setIsOpen] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
+
+  // Load initial theme preference from localStorage on mount
+  useEffect(() => {
+    const savedTheme = localStorage.getItem('theme') as Theme;
+    if (savedTheme) {
+      const timer = setTimeout(() => {
+        setTheme(savedTheme);
+      }, 0);
+      return () => clearTimeout(timer);
+    }
+  }, []);
 
   // Sync theme changes with DOM and localStorage
   useEffect(() => {

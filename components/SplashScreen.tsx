@@ -1,7 +1,6 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
-import Image from 'next/image';
 
 interface SplashScreenProps {
   onComplete?: () => void;
@@ -40,16 +39,12 @@ export default function SplashScreen({ onComplete }: SplashScreenProps) {
     >
       <div className="flex flex-col items-center gap-4 animate-pulse">
         {/* Centered App Logo */}
-        <div className="relative w-16 h-16 sm:w-20 sm:h-20">
-          <Image
-            src="/icon.png"
-            alt="YT Transcripter"
-            width={80}
-            height={80}
-            className="w-full h-full object-contain rounded-2xl shadow-[0_8px_30px_rgba(0,0,0,0.06)] dark:shadow-[0_8px_30px_rgba(0,0,0,0.25)]"
-            priority
-          />
-        </div>
+        <div
+          role="img"
+          aria-label="YT Transcripter"
+          className="w-16 h-16 sm:w-20 sm:h-20 bg-cover bg-center rounded-2xl shadow-[0_8px_30px_rgba(0,0,0,0.06)] dark:shadow-[0_8px_30px_rgba(0,0,0,0.25)]"
+          style={{ backgroundImage: "url('/icon.png')" }}
+        />
         
         {/* Centered Title text */}
         <div className="text-center mt-2">

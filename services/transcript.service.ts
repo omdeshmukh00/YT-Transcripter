@@ -253,6 +253,12 @@ export class TranscriptService {
     }
 
     try {
+      return await this.fetchTranscriptViaYoutubeTranscriptAi(videoId, preferredLang);
+    } catch (err) {
+      console.warn(`youtube-transcript.ai fetch failed for ${videoId}:`, err);
+    }
+
+    try {
       // First try to fetch default transcripts (usually english or auto-generated)
       return await YoutubeTranscript.fetchTranscript(videoId);
     } catch (err) {
@@ -418,5 +424,82 @@ export class TranscriptService {
         lang,
       }))
       .filter((item) => item.text.length > 0);
+  }
+
+  private static async fetchTranscriptViaYoutubeTranscriptAi(
+    videoId: string,
+    preferredLang?: string
+  ): Promise<TranscriptItem[]> {
+    const url = new URL(`https://youtube-transcript.ai/transcript/${videoId}.txt`);
+    if (preferredLang) {
+      url.searchParams.set('lang', preferredLang);
+    }
+
+    const response = await fetch(url.toString(), {
+      headers: {
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+      },
+    });
+
+    if (!response.ok) {
+      throw new Error(`youtube-transcript.ai responded with HTTP ${response.status}`);
+    }
+
+    const body = await response.text();
+    const items = this.parseYoutubeTranscriptAi(body);
+    if (items.length === 0) {
+      throw new Error('youtube-transcript.ai response contained no transcript segments.');
+    }
+    return items;
+  }
+
+  private static parseYoutubeTranscriptAi(text: string): TranscriptItem[] {
+    const lines = text.split('\n');
+    const items: TranscriptItem[] = [];
+    
+    let lang = 'en';
+    const langMatch = text.match(/Language:\s*([a-zA-Z\-]+)/);
+    if (langMatch) {
+      lang = langMatch[1];
+    }
+
+    for (const line of lines) {
+      const match = line.match(/^\[(\d+):(\d+)(?::(\d+))?\]\s*(.*)$/);
+      if (match) {
+        const h_or_m = parseInt(match[1], 10);
+        const m_or_s = parseInt(match[2], 10);
+        const s = match[3] ? parseInt(match[3], 10) : undefined;
+        
+        let offsetMs = 0;
+        if (s !== undefined) {
+          const h = h_or_m;
+          const m = m_or_s;
+          offsetMs = ((h * 3600) + (m * 60) + s) * 1000;
+        } else {
+          const m = h_or_m;
+          const sec = m_or_s;
+          offsetMs = ((m * 60) + sec) * 1000;
+        }
+
+        items.push({
+          offset: offsetMs,
+          duration: 0,
+          text: match[4].trim(),
+          lang,
+        });
+      }
+    }
+
+    for (let i = 0; i < items.length; i++) {
+      const current = items[i];
+      const next = items[i + 1];
+      if (next) {
+        current.duration = next.offset - current.offset;
+      } else {
+        current.duration = 5000; // default 5s
+      }
+    }
+
+    return items;
   }
 }

@@ -2,7 +2,6 @@ import type { Metadata, Viewport } from "next";
 import { Inter, Geist_Mono } from "next/font/google";
 import "./globals.css";
 import PwaRegister from "../components/PwaRegister";
-import { InlineScript } from "../components/InlineScript";
 
 const inter = Inter({
   variable: "--font-inter",
@@ -48,8 +47,10 @@ export default function RootLayout({
       suppressHydrationWarning
     >
       <head>
-        <InlineScript
-          html={`(function(){try{var t=localStorage.getItem('theme')||'light';var d=t==='dark'||(t==='system'&&window.matchMedia('(prefers-color-scheme: dark)').matches);if(d)document.documentElement.classList.add('dark');else document.documentElement.classList.remove('dark')}catch(e){}})()`}
+        <script
+          dangerouslySetInnerHTML={{
+            __html: `(function(){try{var t=localStorage.getItem('theme')||'light';var d=t==='dark'||(t==='system'&&window.matchMedia('(prefers-color-scheme: dark)').matches);if(d)document.documentElement.classList.add('dark');else document.documentElement.classList.remove('dark')}catch(e){}})()`
+          }}
         />
       </head>
       <body className="min-h-full flex flex-col bg-background text-foreground font-sans transition-colors duration-250">
