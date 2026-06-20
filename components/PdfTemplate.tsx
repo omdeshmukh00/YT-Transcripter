@@ -1,0 +1,137 @@
+'use client';
+
+import React from 'react';
+
+export interface TranscriptItem {
+  timestamp: string;
+  text: string;
+}
+
+interface PdfTemplateProps {
+  title: string;
+  videoUrl: string;
+  transcript: TranscriptItem[];
+}
+
+/**
+ * Mathematically segments the transcript lines into pages to fit inside standard A4 height.
+ * The first page leaves extra space (approx 140px) for the video title, URL, and main divider.
+ */
+export function chunkTranscript(transcript: TranscriptItem[]): TranscriptItem[][] {
+  const pages: TranscriptItem[][] = [];
+  let currentPage: TranscriptItem[] = [];
+
+  const maxPageHeight = 690; // A4 height (842) - margins (approx 120-130) = ~710-722. 690 is a safe limit.
+  const titleBlockHeight = 150; // Estimated height for Title, URL and divider on Page 1
+
+  let currentPageHeight = 0;
+  let isFirstPage = true;
+
+  for (const item of transcript) {
+    // Estimate height of each transcript item based on text length:
+    // Base spacing + padding = 22px
+    // Char width is approx 5.5px. A4 content width is 495px (595 - 100).
+    // Timestamp column is 50px, text column is 445px.
+    // Average character width is ~5.5px at 11pt, so ~80 characters fit per line.
+    const charsPerLine = 80;
+    const linesCount = Math.ceil(item.text.length / charsPerLine) || 1;
+    const itemHeight = 22 + linesCount * 16; // 22px base + 16px per line
+
+    const limit = isFirstPage ? maxPageHeight - titleBlockHeight : maxPageHeight;
+
+    if (currentPageHeight + itemHeight > limit && currentPage.length > 0) {
+      pages.push(currentPage);
+      currentPage = [item];
+      currentPageHeight = itemHeight;
+      isFirstPage = false;
+    } else {
+      currentPage.push(item);
+      currentPageHeight += itemHeight;
+    }
+  }
+
+  if (currentPage.length > 0) {
+    pages.push(currentPage);
+  }
+
+  return pages;
+}
+
+export default function PdfTemplate({ title, videoUrl, transcript }: PdfTemplateProps) {
+  const pages = chunkTranscript(transcript);
+  const totalPages = pages.length;
+
+  return (
+    <div className="flex flex-col bg-zinc-950 p-4 gap-8 select-none">
+      {pages.map((pageItems, pageIndex) => {
+        const pageNum = pageIndex + 1;
+        const isPageOne = pageNum === 1;
+
+        return (
+          <div
+            key={pageIndex}
+            className="pdf-page-element w-[595.27px] h-[841.89px] bg-white text-zinc-900 px-[50px] py-[60px] flex flex-col justify-between shadow-2xl relative"
+            style={{
+              fontFamily: "'Mukta', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif",
+            }}
+          >
+            {/* Top Content Area */}
+            <div className="flex-1 flex flex-col">
+              {/* Page 1 Header */}
+              {isPageOne ? (
+                <div className="text-center mb-6">
+                  <h1 className="text-xl font-bold tracking-tight text-zinc-900 leading-snug px-4">
+                    {title}
+                  </h1>
+                  <a
+                    href={videoUrl}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="mt-2 inline-block text-[10px] text-blue-600 underline font-mono break-all"
+                    style={{
+                      fontFamily: 'ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace',
+                    }}
+                  >
+                    Video Link: {videoUrl}
+                  </a>
+                  <div className="mt-4 border-b border-zinc-200 w-full" />
+                </div>
+              ) : (
+                /* Page 2+ Running Header */
+                <div className="flex justify-between items-center text-[10px] text-zinc-400 border-b border-zinc-200 pb-2 mb-4">
+                  <span className="truncate max-w-[350px] font-medium">{title}</span>
+                  <span className="font-semibold text-zinc-500">Video Transcript</span>
+                </div>
+              )}
+
+              {/* Transcript Entries list */}
+              <div className="flex flex-col gap-2.5 flex-1">
+                {pageItems.map((item, index) => (
+                  <div key={index} className="flex gap-4 text-xs">
+                    <span className="w-12 flex-shrink-0 font-bold text-zinc-500 font-mono">
+                      {item.timestamp}
+                    </span>
+                    <p className="flex-1 text-zinc-800 leading-relaxed font-normal whitespace-pre-wrap break-words">
+                      {item.text}
+                    </p>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            {/* Bottom Footer Area */}
+            <div className="mt-4">
+              <div className="border-t border-zinc-200 w-full mb-3" />
+              <div className="flex justify-between items-center text-[9px] text-zinc-400">
+                <span className="font-medium">Generated by YT Transcripter</span>
+                <span className="font-semibold">
+                  Page {pageNum} of {totalPages}
+                </span>
+              </div>
+            </div>
+          </div>
+        );
+      })}
+    </div>
+  );
+}
