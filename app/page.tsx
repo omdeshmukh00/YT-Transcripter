@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import Image from 'next/image';
 import { FiAlertTriangle, FiWifiOff, FiInfo } from 'react-icons/fi';
 import UrlInput from '../components/UrlInput';
@@ -39,6 +39,7 @@ export default function Home() {
   const [pdfBlob, setPdfBlob] = useState<Blob | null>(null);
   const [pdfBlobUrl, setPdfBlobUrl] = useState<string | null>(null);
   const [isPdfLoading, setIsPdfLoading] = useState(false);
+  const pdfBlobUrlRef = useRef<string | null>(null);
 
   // PDF Compile Data State (for hidden client-side page rendering)
   const [pdfCompileData, setPdfCompileData] = useState<{ title: string; url: string; transcript: TranscriptLine[] } | null>(null);
@@ -75,6 +76,7 @@ export default function Home() {
   // Preview Modal state
   const [isPreviewOpen, setIsPreviewOpen] = useState(false);
   const [previewTitle, setPreviewTitle] = useState('');
+  const [previewVideoUrl, setPreviewVideoUrl] = useState('');
 
   // 1. Monitor network connectivity status
   useEffect(() => {
@@ -112,17 +114,27 @@ export default function Home() {
     return () => clearTimeout(timer);
   }, []);
 
-  // Revoke Blob URLs when activeVideo changes to prevent memory leaks
+  // Keep the current Blob URL alive for previews, and revoke it only when replacing or unmounting.
   useEffect(() => {
-    if (pdfBlobUrl) {
-      URL.revokeObjectURL(pdfBlobUrl);
-      const timer = setTimeout(() => {
-        setPdfBlobUrl(null);
-        setPdfBlob(null);
-      }, 0);
-      return () => clearTimeout(timer);
+    pdfBlobUrlRef.current = pdfBlobUrl;
+  }, [pdfBlobUrl]);
+
+  useEffect(() => {
+    return () => {
+      if (pdfBlobUrlRef.current) {
+        URL.revokeObjectURL(pdfBlobUrlRef.current);
+      }
+    };
+  }, []);
+
+  const clearPdfCache = useCallback(() => {
+    if (pdfBlobUrlRef.current) {
+      URL.revokeObjectURL(pdfBlobUrlRef.current);
+      pdfBlobUrlRef.current = null;
     }
-  }, [activeVideo, pdfBlobUrl]);
+    setPdfBlobUrl(null);
+    setPdfBlob(null);
+  }, []);
 
   // 3. Search and parse YouTube URL
   const handleSearch = useCallback(async (url: string) => {
@@ -133,6 +145,7 @@ export default function Home() {
 
     setIsLoading(true);
     setError(null);
+    clearPdfCache();
     setActiveVideo(null);
 
     try {
@@ -174,7 +187,7 @@ export default function Home() {
     } finally {
       setIsLoading(false);
     }
-  }, [isOffline, preferredLanguage, history]);
+  }, [isOffline, preferredLanguage, history, clearPdfCache]);
 
   // 3a. Listen to incoming shared links on mount (Web Share Target)
   useEffect(() => {
@@ -267,6 +280,7 @@ export default function Home() {
     if (!activeVideo) return;
     
     setPreviewTitle(activeVideo.title);
+    setPreviewVideoUrl(activeVideo.url);
     setIsPreviewOpen(true);
 
     if (pdfBlobUrl) return; // Use already cached PDF
@@ -337,6 +351,7 @@ export default function Home() {
   // 8. History Card Interactions (Download/Preview/Share directly from history)
   const handlePreviewHistoryItem = async (item: HistoryItem) => {
     setPreviewTitle(item.title);
+    setPreviewVideoUrl(item.url);
     setIsPreviewOpen(true);
     setIsPdfLoading(true);
 
@@ -406,7 +421,58 @@ export default function Home() {
     }
   };
 
+  const handlePreviewDownload = () => {
+    if (!pdfBlobUrl) return;
+
+    const safeTitle = getSafeFilename(previewTitle || 'transcript');
+    const a = document.createElement('a');
+    a.href = pdfBlobUrl;
+    a.download = `${safeTitle}_transcript.pdf`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+  };
+
+  const handlePreviewShare = async () => {
+    if (!pdfBlob || !pdfBlobUrl) return;
+
+    const safeTitle = getSafeFilename(previewTitle || 'transcript');
+    const file = new File([pdfBlob], `${safeTitle}_transcript.pdf`, { type: 'application/pdf' });
+
+    try {
+      if (navigator.canShare && navigator.canShare({ files: [file] })) {
+        await navigator.share({
+          files: [file],
+          title: previewTitle,
+          text: `Check out the transcript for "${previewTitle}"!`,
+        });
+      } else if (navigator.share && previewVideoUrl) {
+        await navigator.share({
+          title: previewTitle,
+          text: `Transcript of YouTube video: ${previewTitle}`,
+          url: previewVideoUrl,
+        });
+      } else if (previewVideoUrl) {
+        await navigator.clipboard.writeText(`${previewTitle} - ${previewVideoUrl}`);
+        alert('Video title and link copied to clipboard!');
+      } else {
+        await navigator.clipboard.writeText(previewTitle);
+        alert('Transcript title copied to clipboard!');
+      }
+    } catch (err) {
+      if (!isAbortError(err)) {
+        if (previewVideoUrl) {
+          await navigator.clipboard.writeText(`${previewTitle} - ${previewVideoUrl}`);
+          alert('Sharing could not be completed. Copying link to clipboard instead.');
+        } else {
+          alert(getErrorMessage(err, 'Sharing could not be completed.'));
+        }
+      }
+    }
+  };
+
   const handleSelectHistoryItem = (item: HistoryItem) => {
+    clearPdfCache();
     setActiveVideo({
       videoId: item.id,
       title: item.title,
@@ -428,8 +494,7 @@ export default function Home() {
     
     setIsLoading(true);
     setError(null);
-    setPdfBlob(null);
-    setPdfBlobUrl(null);
+    clearPdfCache();
 
     try {
       const res = await fetch('/api/transcript', {
@@ -478,6 +543,7 @@ export default function Home() {
     setHistory(updated);
     localStorage.setItem(HISTORY_KEY, JSON.stringify(updated));
     if (activeVideo && activeVideo.videoId === id) {
+      clearPdfCache();
       setActiveVideo(null);
     }
   };
@@ -628,8 +694,8 @@ export default function Home() {
         onClose={() => setIsPreviewOpen(false)}
         pdfBlobUrl={pdfBlobUrl}
         title={previewTitle}
-        onDownload={handleDownload}
-        onShare={handleShare}
+        onDownload={handlePreviewDownload}
+        onShare={handlePreviewShare}
         isLoading={isPdfLoading}
       />
     </div>

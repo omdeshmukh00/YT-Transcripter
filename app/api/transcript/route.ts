@@ -1,6 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { TranscriptService } from '../../../services/transcript.service';
 
+export const runtime = 'nodejs';
+export const maxDuration = 30;
+export const preferredRegion = 'bom1';
+
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();

@@ -49,6 +49,14 @@ interface Json3Transcript {
   }[];
 }
 
+interface InnertubePlayerResponse {
+  captions?: {
+    playerCaptionsTracklistRenderer?: {
+      captionTracks?: CaptionTrack[];
+    };
+  };
+}
+
 /**
  * Extracts JSON assigned to a variable in HTML by matching balanced braces.
  */
@@ -239,6 +247,12 @@ export class TranscriptService {
     preferredLang?: string
   ): Promise<TranscriptItem[]> {
     try {
+      return await this.fetchTranscriptViaAndroidInnertube(videoId, preferredLang);
+    } catch (err) {
+      console.warn(`Android InnerTube transcript fetch failed for ${videoId}:`, err);
+    }
+
+    try {
       // First try to fetch default transcripts (usually english or auto-generated)
       return await YoutubeTranscript.fetchTranscript(videoId);
     } catch (err) {
@@ -272,6 +286,49 @@ export class TranscriptService {
       // If all fails, throw original error
       throw error;
     }
+  }
+
+  private static async fetchTranscriptViaAndroidInnertube(
+    videoId: string,
+    preferredLang?: string
+  ): Promise<TranscriptItem[]> {
+    const clientVersion = '20.10.38';
+    const userAgent = `com.google.android.youtube/${clientVersion} (Linux; U; Android 14)`;
+
+    const response = await fetch('https://www.youtube.com/youtubei/v1/player?prettyPrint=false', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'User-Agent': userAgent,
+        'Accept-Language': preferredLang || 'en-US,en;q=0.9',
+      },
+      body: JSON.stringify({
+        context: {
+          client: {
+            clientName: 'ANDROID',
+            clientVersion,
+            androidSdkVersion: 35,
+            hl: preferredLang || 'en',
+            gl: 'IN',
+            userAgent,
+          },
+        },
+        videoId,
+      }),
+    });
+
+    if (!response.ok) {
+      throw new Error(`Android InnerTube request failed with ${response.status}.`);
+    }
+
+    const data = (await response.json()) as InnertubePlayerResponse;
+    const captionTracks = data.captions?.playerCaptionsTracklistRenderer?.captionTracks || [];
+
+    if (captionTracks.length === 0) {
+      throw new Error('Android InnerTube returned no caption tracks.');
+    }
+
+    return this.fetchTranscriptFromCaptionTracks(captionTracks, preferredLang);
   }
 
   private static async fetchTranscriptFromCaptionTracks(
