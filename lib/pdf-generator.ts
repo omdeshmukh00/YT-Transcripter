@@ -29,6 +29,11 @@ export async function generatePdfClient(containerId: string): Promise<Blob> {
   for (let i = 0; i < pageElements.length; i++) {
     const pageEl = pageElements[i] as HTMLElement;
 
+    // Ensure all custom fonts (especially Devanagari fonts like Mukta) are loaded before capturing
+    if (typeof window !== 'undefined' && 'fonts' in document) {
+      await document.fonts.ready;
+    }
+
     // Compile page element to canvas
     // scale: 2 produces high-DPI crisp visuals (looks like native PDF print)
     const canvas = await html2canvas(pageEl, {

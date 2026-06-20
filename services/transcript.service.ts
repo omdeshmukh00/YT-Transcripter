@@ -55,6 +55,11 @@ interface InnertubePlayerResponse {
       captionTracks?: CaptionTrack[];
     };
   };
+  videoDetails?: {
+    title?: string;
+    author?: string;
+    lengthSeconds?: string;
+  };
 }
 
 /**
@@ -219,15 +224,26 @@ export class TranscriptService {
 
     // Populate available languages with the active one if tracklist is empty
     if (availableLanguages.length === 0) {
-      availableLanguages = [{
-        code: languageCode,
-        name: language
-      }];
+      const customItems = transcriptItems as TranscriptItem[] & { availableLanguages?: AvailableLanguage[] };
+      if (customItems.availableLanguages && customItems.availableLanguages.length > 0) {
+        availableLanguages = customItems.availableLanguages;
+      } else {
+        availableLanguages = [{
+          code: languageCode,
+          name: language
+        }];
+      }
+    }
+
+    let videoTitle = details.title;
+    const customItems = transcriptItems as TranscriptItem[] & { title?: string; availableLanguages?: AvailableLanguage[] };
+    if ((!videoTitle || videoTitle === 'YouTube Video' || videoTitle === 'YouTube' || videoTitle === 'Unknown Title') && customItems.title) {
+      videoTitle = customItems.title;
     }
 
     return {
       videoId,
-      title: details.title,
+      title: videoTitle,
       url: standardUrl,
       thumbnailUrl: details.thumbnailUrl,
       duration: durationStr,
@@ -334,7 +350,12 @@ export class TranscriptService {
       throw new Error('Android InnerTube returned no caption tracks.');
     }
 
-    return this.fetchTranscriptFromCaptionTracks(captionTracks, preferredLang);
+    const items = await this.fetchTranscriptFromCaptionTracks(captionTracks, preferredLang);
+    const customItems = items as TranscriptItem[] & { title?: string };
+    if (data.videoDetails?.title) {
+      customItems.title = data.videoDetails.title;
+    }
+    return items;
   }
 
   private static async fetchTranscriptFromCaptionTracks(
@@ -450,6 +471,43 @@ export class TranscriptService {
     if (items.length === 0) {
       throw new Error('youtube-transcript.ai response contained no transcript segments.');
     }
+
+    // Parse video title from the first header line (e.g. "# Transcript: Rick Astley...")
+    const titleMatch = body.match(/^# Transcript:\s*(.*)$/m);
+    const parsedTitle = titleMatch ? titleMatch[1].trim() : '';
+
+    const customItems = items as TranscriptItem[] & { title?: string; availableLanguages?: AvailableLanguage[] };
+    if (parsedTitle) {
+      customItems.title = parsedTitle;
+    }
+
+    // Parse other available languages and attach to the returned array
+    const availableLangs = this.parseAvailableLanguagesFromYoutubeTranscriptAi(body);
+    if (availableLangs.length > 0) {
+      // Also add the active language to the available languages list if it's not already there
+      const activeLangCode = items[0]?.lang || preferredLang || 'en';
+      const hasActive = availableLangs.some(l => l.code === activeLangCode);
+      if (!hasActive) {
+        const langNames: Record<string, string> = {
+          en: 'English',
+          hi: 'Hindi',
+          mr: 'Marathi',
+          es: 'Spanish',
+          fr: 'French',
+          de: 'German',
+          ja: 'Japanese',
+          zh: 'Chinese',
+          ru: 'Russian',
+          pt: 'Portuguese',
+          pa: 'Punjabi',
+        };
+        const baseCode = activeLangCode.split('-')[0].toLowerCase();
+        const activeName = langNames[baseCode] || baseCode.toUpperCase();
+        availableLangs.unshift({ code: activeLangCode, name: activeName });
+      }
+      customItems.availableLanguages = availableLangs;
+    }
+
     return items;
   }
 
@@ -501,5 +559,58 @@ export class TranscriptService {
     }
 
     return items;
+  }
+
+  private static parseAvailableLanguagesFromYoutubeTranscriptAi(text: string): AvailableLanguage[] {
+    const match = text.match(/Other available languages:\s*(.*)/);
+    if (!match) return [];
+    
+    const langsStr = match[1];
+    const cleanLangsStr = langsStr.split('\n')[0].trim();
+    const parts = cleanLangsStr.split(',').map(p => p.trim());
+    
+    const langNames: Record<string, string> = {
+      en: 'English',
+      hi: 'Hindi',
+      mr: 'Marathi',
+      es: 'Spanish',
+      fr: 'French',
+      de: 'German',
+      ja: 'Japanese',
+      zh: 'Chinese',
+      ru: 'Russian',
+      pt: 'Portuguese',
+      pa: 'Punjabi',
+      it: 'Italian',
+      ko: 'Korean',
+      vi: 'Vietnamese',
+      ar: 'Arabic',
+      tr: 'Turkish',
+      nl: 'Dutch',
+      pl: 'Polish',
+      sv: 'Swedish',
+      id: 'Indonesian',
+    };
+
+    const available: AvailableLanguage[] = [];
+    
+    for (const part of parts) {
+      const itemMatch = part.match(/^([a-zA-Z0-9\-]+)(?:\s*\(([^)]+)\))?(?:\s*\[([^\]]+)\])?$/);
+      if (itemMatch) {
+        const code = itemMatch[1];
+        const standardCode = itemMatch[2] || code;
+        const isAuto = itemMatch[3] === 'auto';
+        
+        const baseCode = standardCode.split('-')[0].toLowerCase();
+        let name = langNames[baseCode] || baseCode.toUpperCase();
+        if (isAuto) {
+          name += ' (Auto)';
+        }
+        
+        available.push({ code, name });
+      }
+    }
+    
+    return available;
   }
 }

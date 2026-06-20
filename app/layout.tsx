@@ -1,5 +1,5 @@
 import type { Metadata, Viewport } from "next";
-import { Inter, Geist_Mono } from "next/font/google";
+import { Inter, Geist_Mono, Mukta } from "next/font/google";
 import "./globals.css";
 import PwaRegister from "../components/PwaRegister";
 
@@ -11,6 +11,12 @@ const inter = Inter({
 const geistMono = Geist_Mono({
   variable: "--font-geist-mono",
   subsets: ["latin"],
+});
+
+const mukta = Mukta({
+  weight: ["400", "500", "600", "700"],
+  variable: "--font-mukta",
+  subsets: ["latin", "devanagari"],
 });
 
 export const metadata: Metadata = {
@@ -43,7 +49,7 @@ export default function RootLayout({
   return (
     <html
       lang="en"
-      className={`${inter.variable} ${geistMono.variable} h-full antialiased`}
+      className={`${inter.variable} ${geistMono.variable} ${mukta.variable} h-full antialiased`}
       suppressHydrationWarning
     >
       <head>

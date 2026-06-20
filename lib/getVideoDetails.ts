@@ -112,15 +112,15 @@ export async function getVideoDetails(videoId: string): Promise<VideoDetails> {
     // Secondary fallback using direct regex
     const ogTitleMatch = html.match(/<meta property="og:title" content="(.*?)">/);
     const titleMatch = html.match(/<title>(.*?)<\/title>/);
-    let title = 'Unknown Video';
+    let title = 'YouTube Video';
     if (ogTitleMatch && ogTitleMatch[1]) {
-      title = ogTitleMatch[1];
+      title = ogTitleMatch[1].trim();
     } else if (titleMatch && titleMatch[1]) {
-      title = titleMatch[1].replace(' - YouTube', '');
+      title = titleMatch[1].replace(' - YouTube', '').trim();
     }
 
     return {
-      title,
+      title: title || 'YouTube Video',
       author: 'YouTube Creator',
       thumbnailUrl: `https://i.ytimg.com/vi/${videoId}/hqdefault.jpg`,
       videoUrl,

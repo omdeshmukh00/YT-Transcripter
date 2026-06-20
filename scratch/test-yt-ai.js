@@ -1,21 +1,28 @@
-const videoId = '_y_joEiu6Ak';
+const videoId = 'dQw4w9WgXcQ';
 
 async function run() {
   const url = `https://youtube-transcript.ai/transcript/${videoId}.txt`;
-  console.log(`Fetching from: ${url}...`);
+  console.log(`Fetching: ${url}`);
   try {
     const res = await fetch(url);
-    console.log(`HTTP Status: ${res.status}`);
     if (!res.ok) {
-      const text = await res.text();
-      console.log(`Error Response:`, text);
+      console.log('HTTP Error:', res.status);
       return;
     }
     const text = await res.text();
-    console.log(`Success! First 500 characters of response:`);
-    console.log(text.substring(0, 500));
+    // Print lines before "## Transcript"
+    const lines = text.split('\n');
+    const headerLines = [];
+    for (const line of lines) {
+      if (line.trim() === '## Transcript') {
+        break;
+      }
+      headerLines.push(line);
+    }
+    console.log('Header:');
+    console.log(headerLines.join('\n'));
   } catch (err) {
-    console.error('Fetch error:', err);
+    console.error(err);
   }
 }
 

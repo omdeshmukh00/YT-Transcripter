@@ -29,13 +29,13 @@ export function chunkTranscript(transcript: TranscriptItem[]): TranscriptItem[][
 
   for (const item of transcript) {
     // Estimate height of each transcript item based on text length:
-    // Base spacing + padding = 22px
-    // Char width is approx 5.5px. A4 content width is 495px (595 - 100).
-    // Timestamp column is 50px, text column is 445px.
-    // Average character width is ~5.5px at 11pt, so ~80 characters fit per line.
-    const charsPerLine = 80;
+    // Base spacing + padding = 24px
+    // Char width is approx 7.4px at 14px font. A4 content width is 495px (595 - 100).
+    // Timestamp column is 60px, text column is 435px.
+    // Average character width is ~7.4px, so ~60 characters fit per line.
+    const charsPerLine = 60;
     const linesCount = Math.ceil(item.text.length / charsPerLine) || 1;
-    const itemHeight = 22 + linesCount * 16; // 22px base + 16px per line
+    const itemHeight = 24 + linesCount * 22; // 24px base + 22px per line (line-height at 14px is approx 22px)
 
     const limit = isFirstPage ? maxPageHeight - titleBlockHeight : maxPageHeight;
 
@@ -72,7 +72,7 @@ export default function PdfTemplate({ title, videoUrl, transcript }: PdfTemplate
             key={pageIndex}
             className="pdf-page-element w-[595.27px] h-[841.89px] bg-white text-zinc-900 px-[50px] py-[60px] flex flex-col justify-between shadow-2xl relative"
             style={{
-              fontFamily: "'Mukta', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif",
+              fontFamily: "var(--font-mukta), -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif",
             }}
           >
             {/* Top Content Area */}
@@ -80,7 +80,7 @@ export default function PdfTemplate({ title, videoUrl, transcript }: PdfTemplate
               {/* Page 1 Header */}
               {isPageOne ? (
                 <div className="text-center mb-6">
-                  <h1 className="text-xl font-bold tracking-tight text-zinc-900 leading-snug px-4">
+                  <h1 className="text-[18px] font-bold tracking-tight text-zinc-900 leading-snug px-4">
                     {title}
                   </h1>
                   <a
@@ -107,8 +107,8 @@ export default function PdfTemplate({ title, videoUrl, transcript }: PdfTemplate
               {/* Transcript Entries list */}
               <div className="flex flex-col gap-2.5 flex-1">
                 {pageItems.map((item, index) => (
-                  <div key={index} className="flex gap-4 text-xs">
-                    <span className="w-12 flex-shrink-0 font-bold text-zinc-500 font-mono">
+                  <div key={index} className="flex gap-4 text-[14px]">
+                    <span className="w-[60px] flex-shrink-0 font-bold text-zinc-500 font-mono">
                       {item.timestamp}
                     </span>
                     <p className="flex-1 text-zinc-800 leading-relaxed font-normal whitespace-pre-wrap break-words">

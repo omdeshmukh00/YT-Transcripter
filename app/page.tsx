@@ -76,6 +76,8 @@ export default function Home() {
   const [isPreviewOpen, setIsPreviewOpen] = useState(false);
   const [previewTitle, setPreviewTitle] = useState('');
   const [previewVideoUrl, setPreviewVideoUrl] = useState('');
+  const [sharedUrl, setSharedUrl] = useState('');
+  const sharedLinkProcessed = useRef(false);
 
   // 1. Monitor network connectivity status
   useEffect(() => {
@@ -176,9 +178,11 @@ export default function Home() {
         transcript: data.transcript,
       };
 
-      const updatedHistory = [newItem, ...history.filter((item) => item.id !== newItem.id)].slice(0, 25);
-      setHistory(updatedHistory);
-      localStorage.setItem(HISTORY_KEY, JSON.stringify(updatedHistory));
+      setHistory((prevHistory) => {
+        const updated = [newItem, ...prevHistory.filter((item) => item.id !== newItem.id)].slice(0, 25);
+        localStorage.setItem(HISTORY_KEY, JSON.stringify(updated));
+        return updated;
+      });
 
     } catch (err) {
       const error = err instanceof Error ? err : new Error(String(err));
@@ -186,11 +190,11 @@ export default function Home() {
     } finally {
       setIsLoading(false);
     }
-  }, [isOffline, preferredLanguage, history, clearPdfCache]);
+  }, [isOffline, preferredLanguage, clearPdfCache]);
 
   // 3a. Listen to incoming shared links on mount (Web Share Target)
   useEffect(() => {
-    if (typeof window !== 'undefined') {
+    if (typeof window !== 'undefined' && !sharedLinkProcessed.current) {
       const searchParams = new URLSearchParams(window.location.search);
       const sharedUrl = searchParams.get('url');
       const sharedText = searchParams.get('text');
@@ -205,18 +209,22 @@ export default function Home() {
       const ytUrl = findYtUrl(sharedUrl) || findYtUrl(sharedText) || findYtUrl(sharedTitle);
 
       if (ytUrl) {
-        // Clear parameters from the URL address bar immediately
-        const cleanUrl = window.location.pathname;
-        window.history.replaceState({}, document.title, cleanUrl);
-
-        // Parse the shared video link
+        sharedLinkProcessed.current = true;
+        
+        // Wrap state and URL updates in setTimeout to satisfy ESLint set-state-in-effect rules
         const timer = setTimeout(() => {
+          setSharedUrl(ytUrl);
+          // Clear parameters from the URL address bar immediately
+          const cleanUrl = window.location.pathname;
+          window.history.replaceState({}, document.title, cleanUrl);
+          // Parse the shared video link
           handleSearch(ytUrl);
         }, 0);
+
         return () => clearTimeout(timer);
       }
     }
-  }, [history, handleSearch]);
+  }, [handleSearch]);
 
   // 4. Compile PDF from Active Video details (Client-side Page-by-Page HTML-to-Canvas-to-PDF)
   const compilePdfBlob = async (video: { title: string; url: string; transcript: TranscriptLine[] }): Promise<{ blob: Blob; url: string }> => {
@@ -592,7 +600,7 @@ export default function Home() {
 
         {/* URL Input Form Card */}
         <div className="bg-white dark:bg-zinc-900/35 border border-zinc-200 dark:border-zinc-800/80 rounded-3xl p-5 sm:p-6 shadow-sm dark:shadow-lg backdrop-blur-md">
-          <UrlInput onSearch={handleSearch} isLoading={isLoading} />
+          <UrlInput onSearch={handleSearch} isLoading={isLoading} initialValue={sharedUrl} />
         </div>
 
         {/* Dynamic Display Panel: Loading | Error | Active Preview */}

@@ -7,11 +7,23 @@ import { extractVideoId } from '../lib/youtube';
 interface UrlInputProps {
   onSearch: (url: string) => void;
   isLoading: boolean;
+  initialValue?: string;
 }
 
-export default function UrlInput({ onSearch, isLoading }: UrlInputProps) {
-  const [url, setUrl] = useState('');
+export default function UrlInput({ onSearch, isLoading, initialValue = '' }: UrlInputProps) {
+  const [url, setUrl] = useState(initialValue);
   const [validationError, setValidationError] = useState<string | null>(null);
+
+  // Sync state if initialValue changes (e.g. on Web Share Target launch)
+  React.useEffect(() => {
+    if (initialValue) {
+      const timer = setTimeout(() => {
+        setUrl(initialValue);
+        setValidationError(null);
+      }, 0);
+      return () => clearTimeout(timer);
+    }
+  }, [initialValue]);
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
