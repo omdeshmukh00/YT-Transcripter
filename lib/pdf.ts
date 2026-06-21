@@ -21,6 +21,7 @@ export interface TranscriptItem {
 export interface PDFDataInput {
   title: string;
   videoUrl: string;
+  thumbnailUrl?: string;
   transcript: TranscriptItem[];
   fontRegularBytes: Uint8Array | ArrayBuffer;
   fontBoldBytes: Uint8Array | ArrayBuffer;
@@ -59,7 +60,7 @@ function wrapText(text: string, font: PDFFont, fontSize: number, maxWidth: numbe
  * Generates a styled, multi-page PDF document from video transcript data.
  */
 export async function generatePdf(input: PDFDataInput): Promise<Uint8Array> {
-  const { title, videoUrl, transcript, fontRegularBytes, fontBoldBytes } = input;
+  const { title, videoUrl, thumbnailUrl, transcript, fontRegularBytes, fontBoldBytes } = input;
 
   const pdfDoc = await PDFDocument.create();
   pdfDoc.registerFontkit(fontkit);
@@ -108,6 +109,39 @@ export async function generatePdf(input: PDFDataInput): Promise<Uint8Array> {
   }
 
   y -= 10; // spacing
+
+  // Draw Thumbnail if available
+  if (thumbnailUrl) {
+    try {
+      const response = await fetch(thumbnailUrl);
+      if (response.ok) {
+        const imageBytes = await response.arrayBuffer();
+        const contentType = response.headers.get('content-type') || '';
+        const image = contentType.includes('png')
+          ? await pdfDoc.embedPng(imageBytes)
+          : await pdfDoc.embedJpg(imageBytes);
+
+        const imgWidth = 160;
+        const imgHeight = 90;
+        const imgX = (PAGE_WIDTH - imgWidth) / 2;
+
+        if (y - imgHeight < MARGIN_BOTTOM + 50) {
+          currentPage = createPage();
+          y = PAGE_HEIGHT - MARGIN_TOP;
+        }
+
+        currentPage.drawImage(image, {
+          x: imgX,
+          y: y - imgHeight,
+          width: imgWidth,
+          height: imgHeight,
+        });
+        y -= (imgHeight + 15);
+      }
+    } catch (err) {
+      console.warn('Failed to embed thumbnail in PDF:', err);
+    }
+  }
 
   // 2. Draw Video URL (centered, blue, size 10, wrapping if needed)
   const urlFontSize = 10;

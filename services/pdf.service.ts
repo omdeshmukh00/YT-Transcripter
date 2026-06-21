@@ -5,6 +5,7 @@ import { generatePdf, TranscriptItem } from '../lib/pdf';
 export interface GeneratePdfRequest {
   title: string;
   videoUrl: string;
+  thumbnailUrl?: string;
   transcript: TranscriptItem[];
 }
 
@@ -28,6 +29,7 @@ export class PdfService {
       return await generatePdf({
         title: data.title,
         videoUrl: data.videoUrl,
+        thumbnailUrl: data.thumbnailUrl,
         transcript: data.transcript,
         fontRegularBytes,
         fontBoldBytes,

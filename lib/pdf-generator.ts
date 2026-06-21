@@ -17,6 +17,17 @@ export async function generatePdfClient(containerId: string): Promise<Blob> {
     throw new Error('No PDF page elements found to compile.');
   }
 
+  // Wait for all images inside the container to be fully loaded before generating canvas
+  const images = container.querySelectorAll('img');
+  const imageLoadPromises = Array.from(images).map((img) => {
+    if (img.complete) return Promise.resolve();
+    return new Promise<void>((resolve) => {
+      img.onload = () => resolve();
+      img.onerror = () => resolve();
+    });
+  });
+  await Promise.all(imageLoadPromises);
+
   // Standard A4 dimensions in Points (pt)
   // 595.27 x 841.89 pt matches the standard A4 ratio
   const doc = new jsPDF({
@@ -35,9 +46,9 @@ export async function generatePdfClient(containerId: string): Promise<Blob> {
     }
 
     // Compile page element to canvas
-    // scale: 2 produces high-DPI crisp visuals (looks like native PDF print)
+    // scale: 4.0 produces ultra-high-resolution sharp visuals (looks sharp even under high zoom)
     const canvas = await html2canvas(pageEl, {
-      scale: 2.2,
+      scale: 4.0,
       useCORS: true,
       logging: false,
       backgroundColor: '#ffffff',
@@ -45,8 +56,8 @@ export async function generatePdfClient(containerId: string): Promise<Blob> {
       windowHeight: 841.89, // Lock virtual viewport height during capture
     });
 
-    // Compress canvas to JPEG for PDF size optimization (keeps download sizes reasonable)
-    const imgData = canvas.toDataURL('image/jpeg', 0.92);
+    // Compress canvas to JPEG for PDF size optimization (quality 0.88 keeps download sizes and details balanced)
+    const imgData = canvas.toDataURL('image/jpeg', 0.88);
 
     if (i > 0) {
       doc.addPage();

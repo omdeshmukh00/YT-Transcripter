@@ -1,7 +1,8 @@
 'use client';
 
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useRef } from 'react';
 import { FiX, FiDownload, FiShare2, FiLoader } from 'react-icons/fi';
+import PdfTemplate, { TranscriptItem } from './PdfTemplate';
 
 interface PdfPreviewModalProps {
   isOpen: boolean;
@@ -11,6 +12,12 @@ interface PdfPreviewModalProps {
   onDownload: () => void;
   onShare: () => void;
   isLoading: boolean;
+  previewData: {
+    title: string;
+    url: string;
+    thumbnailUrl?: string;
+    transcript: TranscriptItem[];
+  } | null;
 }
 
 export default function PdfPreviewModal({
@@ -21,8 +28,11 @@ export default function PdfPreviewModal({
   onDownload,
   onShare,
   isLoading,
+  previewData,
 }: PdfPreviewModalProps) {
   const [isMobile, setIsMobile] = useState(false);
+  const [scale, setScale] = useState(1);
+  const containerRef = useRef<HTMLDivElement>(null);
 
   // Detect if on mobile device to provide a notice (since mobile iframes for PDFs can be hit-or-miss)
   useEffect(() => {
@@ -31,6 +41,30 @@ export default function PdfPreviewModal({
     };
     checkMobile();
   }, []);
+
+  // Calculate dynamic scale factor for mobile preview A4 sheets
+  useEffect(() => {
+    if (!isMobile || !isOpen || !containerRef.current) return;
+
+    const updateScale = () => {
+      if (containerRef.current) {
+        const containerWidth = containerRef.current.clientWidth;
+        // Leave 16px total padding for margins
+        const targetWidth = containerWidth - 16;
+        const newScale = Math.min(1, targetWidth / 595.27);
+        setScale(newScale);
+      }
+    };
+
+    updateScale();
+    const timer = setTimeout(updateScale, 100);
+
+    window.addEventListener('resize', updateScale);
+    return () => {
+      window.removeEventListener('resize', updateScale);
+      clearTimeout(timer);
+    };
+  }, [isMobile, isOpen]);
 
   // Prevent background scrolling when modal is open
   useEffect(() => {
@@ -71,18 +105,31 @@ export default function PdfPreviewModal({
 
         {/* Modal Body / PDF Viewer */}
         <div className="flex-1 bg-zinc-50 dark:bg-zinc-900 flex flex-col items-center justify-center p-4 relative transition-colors duration-200">
-          {isLoading ? (
+          {isLoading && !isMobile ? (
             <div className="flex flex-col items-center gap-3">
               <FiLoader className="w-10 h-10 text-red-500 animate-spin" />
               <p className="text-zinc-500 dark:text-zinc-400 text-sm">Compiling PDF document...</p>
             </div>
+          ) : isMobile && previewData ? (
+            <div className="w-full h-full flex flex-col">
+              <div className="mb-2 bg-zinc-155 dark:bg-zinc-800/80 text-zinc-700 dark:text-zinc-300 text-[11px] rounded-xl p-2.5 text-center font-medium transition-colors border border-zinc-200 dark:border-zinc-800">
+                Showing document preview. Use <strong>Download</strong> or <strong>Share</strong> below to obtain the PDF file.
+              </div>
+              <div 
+                ref={containerRef}
+                className="flex-1 w-full rounded-2xl overflow-y-auto overflow-x-hidden border border-zinc-200 dark:border-zinc-800 bg-zinc-950 p-2"
+              >
+                <PdfTemplate
+                  title={previewData.title}
+                  videoUrl={previewData.url}
+                  thumbnailUrl={previewData.thumbnailUrl}
+                  transcript={previewData.transcript}
+                  scale={scale}
+                />
+              </div>
+            </div>
           ) : pdfBlobUrl ? (
             <div className="w-full h-full flex flex-col">
-              {isMobile && (
-                <div className="mb-2 bg-yellow-50 dark:bg-yellow-500/10 border border-yellow-200 dark:border-yellow-500/20 text-yellow-800 dark:text-yellow-300 text-xs rounded-xl p-3 text-center transition-colors">
-                  Mobile devices may not display inline PDFs. Use the <strong>Download</strong> or <strong>Share</strong> options below to view the file.
-                </div>
-              )}
               <div className="flex-1 w-full rounded-2xl overflow-hidden border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-950 transition-colors">
                 <iframe
                   src={`${pdfBlobUrl}#toolbar=0&navpanes=0&scrollbar=1`}
@@ -100,7 +147,7 @@ export default function PdfPreviewModal({
 
         {/* Modal Footer Actions */}
         <div className="flex flex-col sm:flex-row items-center justify-between gap-3 p-4 sm:p-5 border-t border-zinc-100 dark:border-zinc-800 bg-zinc-50/50 dark:bg-zinc-900/40 transition-colors duration-200">
-          <div className="text-[11px] sm:text-xs text-zinc-500 dark:text-zinc-400 text-center sm:text-left">
+          <div className="text-[11px] sm:text-xs text-zinc-500 dark:text-zinc-400 text-center sm:text-left font-medium">
             YT Transcripter PDF Document
           </div>
 
@@ -110,7 +157,7 @@ export default function PdfPreviewModal({
               disabled={isLoading || !pdfBlobUrl}
               className="flex-1 sm:flex-none flex items-center justify-center gap-1.5 px-4 py-2.5 rounded-xl text-xs sm:text-sm font-semibold text-zinc-700 dark:text-zinc-300 bg-zinc-100 dark:bg-zinc-800 hover:bg-zinc-200 dark:hover:bg-zinc-700 active:scale-[0.97] transition-all disabled:opacity-50"
             >
-              <FiShare2 className="w-4 h-4" />
+              {isLoading ? <FiLoader className="w-4 h-4 animate-spin" /> : <FiShare2 className="w-4 h-4" />}
               <span>Share</span>
             </button>
 
@@ -119,7 +166,7 @@ export default function PdfPreviewModal({
               disabled={isLoading || !pdfBlobUrl}
               className="flex-1 sm:flex-none flex items-center justify-center gap-1.5 px-5 py-2.5 rounded-xl text-xs sm:text-sm font-semibold text-white bg-gradient-to-r from-red-600 to-rose-600 hover:from-red-500 hover:to-rose-500 active:scale-[0.97] transition-all disabled:opacity-50"
             >
-              <FiDownload className="w-4 h-4" />
+              {isLoading ? <FiLoader className="w-4 h-4 animate-spin" /> : <FiDownload className="w-4 h-4" />}
               <span>Download</span>
             </button>
           </div>

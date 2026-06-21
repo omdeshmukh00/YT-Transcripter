@@ -41,7 +41,7 @@ export default function Home() {
   const pdfBlobUrlRef = useRef<string | null>(null);
 
   // PDF Compile Data State (for hidden client-side page rendering)
-  const [pdfCompileData, setPdfCompileData] = useState<{ title: string; url: string; transcript: TranscriptLine[] } | null>(null);
+  const [pdfCompileData, setPdfCompileData] = useState<{ title: string; url: string; thumbnailUrl?: string; transcript: TranscriptLine[] } | null>(null);
 
   // Helper to sanitize filenames for OS download while preserving Unicode/Devanagari characters
   const getSafeFilename = (title: string): string => {
@@ -76,6 +76,7 @@ export default function Home() {
   const [isPreviewOpen, setIsPreviewOpen] = useState(false);
   const [previewTitle, setPreviewTitle] = useState('');
   const [previewVideoUrl, setPreviewVideoUrl] = useState('');
+  const [previewData, setPreviewData] = useState<{ title: string; url: string; thumbnailUrl?: string; transcript: TranscriptLine[] } | null>(null);
   const [sharedUrl, setSharedUrl] = useState('');
   const sharedLinkProcessed = useRef(false);
 
@@ -227,13 +228,18 @@ export default function Home() {
   }, [handleSearch]);
 
   // 4. Compile PDF from Active Video details (Client-side Page-by-Page HTML-to-Canvas-to-PDF)
-  const compilePdfBlob = async (video: { title: string; url: string; transcript: TranscriptLine[] }): Promise<{ blob: Blob; url: string }> => {
+  const compilePdfBlob = async (video: { title: string; url: string; thumbnail?: string; thumbnailUrl?: string; transcript: TranscriptLine[] }): Promise<{ blob: Blob; url: string }> => {
     // 1. Render data to hidden PdfTemplate
-    setPdfCompileData(video);
-    
+    setPdfCompileData({
+      title: video.title,
+      url: video.url,
+      thumbnailUrl: video.thumbnailUrl || video.thumbnail,
+      transcript: video.transcript,
+    });
+
     // 2. Wait for template component to mount/render fully
     await new Promise((resolve) => setTimeout(resolve, 350));
-    
+
     try {
       // 3. Compile canvas segments into PDF blob client-side
       const blob = await generatePdfClient('pdf-template-container');
@@ -288,6 +294,12 @@ export default function Home() {
     
     setPreviewTitle(activeVideo.title);
     setPreviewVideoUrl(activeVideo.url);
+    setPreviewData({
+      title: activeVideo.title,
+      url: activeVideo.url,
+      thumbnailUrl: activeVideo.thumbnailUrl,
+      transcript: activeVideo.transcript,
+    });
     setIsPreviewOpen(true);
 
     if (pdfBlobUrl) return; // Use already cached PDF
@@ -359,6 +371,12 @@ export default function Home() {
   const handlePreviewHistoryItem = async (item: HistoryItem) => {
     setPreviewTitle(item.title);
     setPreviewVideoUrl(item.url);
+    setPreviewData({
+      title: item.title,
+      url: item.url,
+      thumbnailUrl: item.thumbnail,
+      transcript: item.transcript,
+    });
     setIsPreviewOpen(true);
     setIsPdfLoading(true);
 
@@ -670,12 +688,14 @@ export default function Home() {
           <PdfTemplate
             title={pdfCompileData.title}
             videoUrl={pdfCompileData.url}
+            thumbnailUrl={pdfCompileData.thumbnailUrl}
             transcript={pdfCompileData.transcript}
           />
         ) : activeVideo ? (
           <PdfTemplate
             title={activeVideo.title}
             videoUrl={activeVideo.url}
+            thumbnailUrl={activeVideo.thumbnailUrl}
             transcript={activeVideo.transcript}
           />
         ) : null}
@@ -694,12 +714,16 @@ export default function Home() {
       {/* PDF Inline Preview Drawer/Modal */}
       <PdfPreviewModal
         isOpen={isPreviewOpen}
-        onClose={() => setIsPreviewOpen(false)}
+        onClose={() => {
+          setIsPreviewOpen(false);
+          setPreviewData(null);
+        }}
         pdfBlobUrl={pdfBlobUrl}
         title={previewTitle}
         onDownload={handlePreviewDownload}
         onShare={handlePreviewShare}
         isLoading={isPdfLoading}
+        previewData={previewData}
       />
     </div>
   );

@@ -4,7 +4,7 @@ import { PdfService } from '../../../services/pdf.service';
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
-    const { title, url, transcript } = body;
+    const { title, url, thumbnailUrl, transcript } = body;
 
     if (!title || !url || !transcript || !Array.isArray(transcript)) {
       return NextResponse.json(
@@ -16,6 +16,7 @@ export async function POST(request: NextRequest) {
     const pdfBuffer = await PdfService.compilePdf({
       title,
       videoUrl: url,
+      thumbnailUrl,
       transcript,
     });
 
